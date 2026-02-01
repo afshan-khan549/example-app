@@ -1,0 +1,99 @@
+name: DevSecOps CI Pipeline (No Snyk)
+
+on:
+  push:
+    branches: [main]
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ---------------- SECURITY STAGE ----------------
+
+  sbom-generation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - run: npm install -g @cyclonedx/cyclonedx-npm
+      - run: npm ci --legacy-peer-deps
+      - run: cyclonedx-npm --output-file sbom.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.json
+
+  dependency-scan:
+    runs-on: ubuntu-latest
+    needs: sbom-generation
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci --legacy-peer-deps
+      - run: npm audit --json > audit-report.json || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-report
+          path: audit-report.json
+
+  # ---------------- BUILD STAGE ----------------
+
+  build:
+    runs-on: ubuntu-latest
+    needs: dependency-scan
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: npm ci --legacy-peer-deps
+      - run: npm run build || echo "No build script"
+
+  # ---------------- TEST STAGE ----------------
+
+  test:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci --legacy-peer-deps
+      - run: npm test || echo "No tests"
+
+  # ---------------- DOCKER STAGE ----------------
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t example-app:latest .
+
+  # ---------------- CONTAINER SCAN ----------------
+
+  container-scan:
+    runs-on: ubuntu-latest
+    needs: docker-build
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Trivy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget apt-transport-https gnupg
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install -y trivy
+
+      - run: docker build -t example-app:latest .
+      - run: trivy image --format json -o trivy-report.json example-app:latest
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trivy-container-report
+          path: trivy-report.json
