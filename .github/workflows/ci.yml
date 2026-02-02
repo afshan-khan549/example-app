@@ -1,4 +1,4 @@
-name: DevSecOps CI Pipeline (With Docker + Snyk + Artifacts)
+name: DevSecOps CI Pipeline (With Snyk + Artifacts)
 
 on:
   push:
@@ -36,19 +36,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Snyk
-        run: npm install -g snyk
+      - name: Install Snyk & HTML converter
+        run: |
+          npm install -g snyk snyk-to-html
 
       - name: Authenticate Snyk
         run: snyk auth ${{ secrets.SNYK_TOKEN }}
 
       - name: Run Snyk SCA
-        run: snyk test --json > snyk-sca-report.json || true
+        run: |
+          snyk test --json > snyk-sca-report.json || true
+          snyk-to-html -i snyk-sca-report.json -o snyk-sca-report.html
 
       - uses: actions/upload-artifact@v4
         with:
-          name: snyk-sca-report
-          path: snyk-sca-report.json
+          name: snyk-sca-report-html
+          path: snyk-sca-report.html
 
   # ---------------- SNYK SAST (Code) ----------------
   snyk-sast:
@@ -58,19 +61,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Snyk
-        run: npm install -g snyk
+      - name: Install Snyk & HTML converter
+        run: |
+          npm install -g snyk snyk-to-html
 
       - name: Authenticate Snyk
         run: snyk auth ${{ secrets.SNYK_TOKEN }}
 
       - name: Run Snyk Code (SAST)
-        run: snyk code test --json > snyk-sast-report.json || true
+        run: |
+          snyk code test --json > snyk-sast-report.json || true
+          snyk-to-html -i snyk-sast-report.json -o snyk-sast-report.html
 
       - uses: actions/upload-artifact@v4
         with:
-          name: snyk-sast-report
-          path: snyk-sast-report.json
+          name: snyk-sast-report-html
+          path: snyk-sast-report.html
 
   # ---------------- BUILD STAGE ----------------
   build:
@@ -95,36 +101,28 @@ jobs:
       - run: npm ci --legacy-peer-deps
       - run: npm test || echo "No tests"
 
-  # ---------------- DOCKER BUILD ----------------
-  docker-build:
-    name: Docker Build Image
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - uses: actions/checkout@v4
-      - run: docker build -t example-app:latest .
-
   # ---------------- SNYK CONTAINER SCAN ----------------
   snyk-container:
     name: Snyk Container Scan (Docker Image)
     runs-on: ubuntu-latest
-    needs: docker-build
+    needs: build
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Snyk
-        run: npm install -g snyk
+      - name: Install Snyk & HTML converter
+        run: |
+          npm install -g snyk snyk-to-html
 
       - name: Authenticate Snyk
         run: snyk auth ${{ secrets.SNYK_TOKEN }}
 
-      - name: Build Docker image
-        run: docker build -t example-app:latest .
-
-      - name: Scan Docker Image
-        run: snyk container test example-app:latest --json > snyk-container-report.json || true
+      - name: Build & Scan Docker Image
+        run: |
+          docker build -t example-app:latest .
+          snyk container test example-app:latest --json > snyk-container-report.json || true
+          snyk-to-html -i snyk-container-report.json -o snyk-container-report.html
 
       - uses: actions/upload-artifact@v4
         with:
-          name: snyk-container-report
-          path: snyk-container-report.json
+          name: snyk-container-report-html
+          path: snyk-container-report.html
