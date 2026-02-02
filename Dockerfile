@@ -20,7 +20,8 @@ WORKDIR /app
 RUN addgroup --system api && \
     adduser --system -G api api
 
-COPY --from=builder /app/dist/apps/api ./api
+# ✅ Correct Nx output path
+COPY --from=builder /app/dist/api ./api
 
 RUN npm --prefix api --omit=dev install
 
