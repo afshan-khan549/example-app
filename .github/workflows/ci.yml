@@ -8,7 +8,6 @@ env:
   NODE_VERSION: '20'
 
 jobs:
-  # ---------------- SBOM STAGE ----------------
   sbom-generation:
     name: SBOM Generation
     runs-on: ubuntu-latest
@@ -28,7 +27,6 @@ jobs:
           name: sbom-artifact
           path: sbom.json
 
-  # ---------------- SNYK SCA (Dependencies) ----------------
   snyk-sca:
     name: Snyk SCA Scan (Dependencies)
     runs-on: ubuntu-latest
@@ -53,7 +51,6 @@ jobs:
           name: snyk-sca-report-html
           path: snyk-sca-report.html
 
-  # ---------------- SNYK SAST (Code) ----------------
   snyk-sast:
     name: Snyk SAST Scan (Code)
     runs-on: ubuntu-latest
@@ -78,7 +75,6 @@ jobs:
           name: snyk-sast-report-html
           path: snyk-sast-report.html
 
-  # ---------------- BUILD STAGE ----------------
   build:
     name: Build Application
     runs-on: ubuntu-latest
@@ -91,7 +87,6 @@ jobs:
       - run: npm ci --legacy-peer-deps
       - run: npm run build || echo "No build script"
 
-  # ---------------- TEST STAGE ----------------
   test:
     name: Run Tests
     runs-on: ubuntu-latest
@@ -101,7 +96,6 @@ jobs:
       - run: npm ci --legacy-peer-deps
       - run: npm test || echo "No tests"
 
-  # ---------------- SNYK CONTAINER SCAN ----------------
   snyk-container:
     name: Snyk Container Scan (Docker Image)
     runs-on: ubuntu-latest
