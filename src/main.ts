@@ -7,7 +7,8 @@ import HttpException from './app/models/http-exception.model';
 const app = express();
 
 /**
- * App Configuration
+ * App Configuration in main
+ *
  */
 
 app.use(cors());
@@ -28,7 +29,7 @@ app.use(
     err: Error | HttpException,
     req: express.Request,
     res: express.Response,
-    next: express.NextFunction,
+    next: express.NextFunction
   ) => {
     // @ts-ignore
     if (err && err.name === 'UnauthorizedError') {
@@ -43,7 +44,7 @@ app.use(
     } else if (err) {
       res.status(500).json(err.message);
     }
-  },
+  }
 );
 
 /**
